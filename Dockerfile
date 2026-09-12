@@ -91,3 +91,47 @@ RUN echo "Listen 8080" >> /etc/apache2/ports.conf
 EXPOSE 8080
 
 USER www-data
+
+# ---
+
+FROM --platform=$BUILDPLATFORM node:24-bookworm AS web-builder
+
+LABEL org.opencontainers.image.description="Builds the web distribution."
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install --package-lock-only && npm ci
+
+COPY . .
+RUN npm run build && test -f dist/Web/api.html
+
+# api.html waits for a postMessage when the app is not in the query string, so a
+# plain visit to / renders nothing. Pick the app it falls back to, or leave the
+# argument empty to keep the upstream behaviour.
+ARG DEFAULT_APP=ONLINE
+RUN if [ -n "$DEFAULT_APP" ]; then \
+      grep -q "params.get('app')" dist/Web/api.html && \
+      sed -i "s/params.get('app')/params.get('app') || '$DEFAULT_APP'/" dist/Web/api.html; \
+    fi
+
+RUN cat <<EOF > /app/default.conf
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index api.html;
+}
+EOF
+
+# ---
+
+FROM nginx:1.27-alpine AS web
+
+LABEL org.opencontainers.image.description="Serves the roBrowserLegacy web client."
+
+COPY --from=web-builder /app/dist/Web /usr/share/nginx/html
+COPY --from=web-builder /app/default.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
