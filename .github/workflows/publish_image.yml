@@ -7,8 +7,6 @@ concurrency:
 on:
     push:
         branches: ['master']
-    schedule:
-        - cron: '0 4 * * 1'
     workflow_dispatch:
 
 permissions:
@@ -22,7 +20,6 @@ jobs:
     publish:
         name: 'Build and push'
         runs-on: ubuntu-latest
-        if: github.repository_owner != 'MrAntares'
 
         steps:
             - name: 'Checkout the repository'
