@@ -104,24 +104,26 @@ COPY package*.json ./
 RUN npm install --package-lock-only && npm ci
 
 COPY . .
-RUN npm run build && test -f dist/Web/api.html
 
-# api.html waits for a postMessage when the app is not in the query string, so a
-# plain visit to / renders nothing. Pick the app it falls back to, or leave the
-# argument empty to keep the upstream behaviour.
-ARG DEFAULT_APP=ONLINE
-RUN if [ -n "$DEFAULT_APP" ]; then \
-      grep -q "params.get('app')" dist/Web/api.html && \
-      sed -i "s/params.get('app')/params.get('app') || '$DEFAULT_APP'/" dist/Web/api.html; \
-    fi
+# -H is only there for Config.js, which createHTML generates. Its index.html is a
+# launcher that opens the other apps in a popup, and api.html is the dispatcher
+# behind it. Both go, replaced by a page that imports Online.js directly.
+RUN npm run build -- -O -T -H && test -f dist/Web/Config.js
+RUN rm -f dist/Web/api.html dist/Web/api.js
+COPY applications/docker/index.html dist/Web/index.html
 
+# The include lets a deployment mount extra locations, typically to reverse proxy
+# the asset server and the WebSocket proxy under the same origin. A wildcard that
+# matches nothing is not an error.
 RUN cat <<EOF > /app/default.conf
 server {
     listen 80;
     server_name _;
 
     root /usr/share/nginx/html;
-    index api.html;
+    index index.html;
+
+    include /etc/nginx/robrowser.d/*.conf;
 }
 EOF
 

@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <title>roBrowserLegacy</title>
+        <style>
+            html,
+            body {
+                margin: 0;
+                padding: 0;
+                border: 0;
+                height: 100%;
+                width: 100%;
+                overflow: hidden;
+            }
+        </style>
+        <script src="Config.js"></script>
+        <script
+            src="Config.local.js"
+            onerror="console.log('Config.local.js not found, using the defaults from Config.js')"
+        ></script>
+    </head>
+    <body>
+        <script type="module">
+            function deepMerge(target, source) {
+                for (const key in source) {
+                    if (!Object.prototype.hasOwnProperty.call(source, key)) {
+                        continue;
+                    }
+                    const value = source[key];
+                    if (value && typeof value === 'object' && !Array.isArray(value)) {
+                        target[key] = deepMerge(target[key] || {}, value);
+                    } else {
+                        target[key] = value;
+                    }
+                }
+                return target;
+            }
+
+            const config = deepMerge({}, window.ROConfigBase || {});
+            window.ROConfig = window.ROConfigLocal ? deepMerge(config, window.ROConfigLocal) : config;
+
+            await import('./Online.js');
+        </script>
+    </body>
+</html>
