@@ -307,7 +307,7 @@ function onSkillResult(pkt) {
  * @param {object} pkt - PACKET_ZC_SKILLINFO_LIST
  */
 function onSkillList(pkt) {
-	SkillWindow.getUI().setSkills(pkt.skillList);
+	SkillWindow.setSkills(pkt.skillList);
 }
 
 /**
@@ -316,7 +316,7 @@ function onSkillList(pkt) {
  * @param {object} pkt - PACKET.ZC.SKILLINFO_UPDATE
  */
 function onSkillUpdate(pkt) {
-	SkillWindow.getUI().updateSkill(pkt);
+	SkillWindow.updateSkill(pkt);
 }
 
 /**
@@ -337,7 +337,7 @@ function onShortCutList(pkt) {
  * @param {object} pkt - PACKET.ZC.ADD_SKILL
  */
 function onSkillAdded(pkt) {
-	SkillWindow.getUI().addSkill(pkt.data);
+	SkillWindow.addSkill(pkt.data);
 }
 
 /**
@@ -346,7 +346,7 @@ function onSkillAdded(pkt) {
  * @param {object} pkt - PACKET.ZC.AUTORUN_SKILL
  */
 function onAutoCastSkill(pkt) {
-	SkillWindow.getUI().useSkill(pkt.data);
+	SkillWindow.useSkill(pkt.data);
 }
 
 /**
@@ -388,12 +388,12 @@ function onIdentifyResult(pkt) {
 			ChatBox.addText(DB.getMessage(491), ChatBox.TYPE.BLUE, ChatBox.FILTER.ITEM);
 
 			// Remove old item
-			const item = Inventory.getUI().removeItem(pkt.index, 1);
+			const item = Inventory.removeItem(pkt.index, 1);
 
 			// Add new item updated
 			if (item) {
 				item.IsIdentified = true;
-				Inventory.getUI().addItem(item);
+				Inventory.addItem(item);
 			}
 			break;
 		}
@@ -665,8 +665,8 @@ function onUseSkill(id, level, targetID) {
 	let entity;
 	let range;
 
-	const isHomun = id > SkillId.HOMUN_BEGIN && id < SkillId.HOMUN_LAST;
-	const isMerc = id > SkillId.MERCENARY_BEGIN && id < SkillId.MERCENARY_LAST;
+	const isHomun = id >= SkillId.HOMUN_BEGIN && id <= SkillId.HOMUN_LAST;
+	const isMerc = id >= SkillId.MERCENARY_BEGIN && id <= SkillId.MERCENARY_LAST;
 
 	// Not used so far
 	//var isElem = (id > SkillId.ELEMENTAL_BEGIN && id < SkillId.ELEMENTAL_LAST);
@@ -691,7 +691,7 @@ function onUseSkill(id, level, targetID) {
 	}
 
 	const target = EntityManager.get(targetID) || entity;
-	const skill = SkillWindow.getUI().getSkillById(id);
+	const skill = SkillWindow.getSkillById(id);
 	const out = [];
 
 	if (skill) {
@@ -777,10 +777,13 @@ SkillTargetSelection.onUseSkillToPos = function onUseSkillToPos(id, level, x, y)
 	let entity;
 	let range;
 
-	const isHomun = id > 8000 && id < 8044;
+	const isHomun = id >= SkillId.HOMUN_BEGIN && id <= SkillId.HOMUN_LAST;
+	const isMerc = id >= SkillId.MERCENARY_BEGIN && id <= SkillId.MERCENARY_LAST;
 
 	if (isHomun) {
 		entity = EntityManager.get(Session.homunId);
+	} else if (isMerc) {
+		entity = EntityManager.get(Session.mercId);
 	} else {
 		entity = Session.Entity;
 		if (entity.isOverWeight) {
@@ -796,7 +799,7 @@ SkillTargetSelection.onUseSkillToPos = function onUseSkillToPos(id, level, x, y)
 	}
 
 	const pos = entity.position;
-	const skill = SkillWindow.getUI().getSkillById(id);
+	const skill = SkillWindow.getSkillById(id);
 	const out = [];
 
 	if (skill) {
@@ -843,6 +846,9 @@ SkillTargetSelection.onUseSkillToPos = function onUseSkillToPos(id, level, x, y)
 	if (isHomun) {
 		pkt = new PACKET.CZ.REQUEST_MOVENPC();
 		pkt.GID = Session.homunId;
+	} else if (isMerc) {
+		pkt = new PACKET.CZ.REQUEST_MOVENPC();
+		pkt.GID = Session.mercId;
 	} else {
 		if (PACKETVER.value >= 20180307) {
 			pkt = new PACKET.CZ.REQUEST_MOVE2();
@@ -932,8 +938,8 @@ function onSense(pkt) {
 }
 
 function hookSkillWindow() {
-	SkillWindow.getUI().onIncreaseSkill = onIncreaseSkill;
-	SkillWindow.getUI().onUseSkill = onUseSkill;
+	SkillWindow.onIncreaseSkill = onIncreaseSkill;
+	SkillWindow.onUseSkill = onUseSkill;
 }
 
 /**

@@ -194,6 +194,8 @@ function free(gl) {
 			_textures[i] = null;
 		}
 	}
+
+	_vertCount = 0;
 }
 
 /**

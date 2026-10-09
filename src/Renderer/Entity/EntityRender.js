@@ -530,6 +530,16 @@ const renderEntity = (function renderEntityClosure() {
 					renderElement(self, self.files.body, 'body', _position, true);
 				});
 				break;
+			case Entity.TYPE_NPC:
+			case Entity.TYPE_NPC2:
+				SpriteRenderer.position[2] = SpriteRenderer.position[2] + 0.2;
+				SpriteRenderer.ignoreDepthMinCap = true;
+				SpriteRenderer.zIndex = 150;
+				SpriteRenderer.runWithDepth(true, true, false, function () {
+					renderElement(self, self.files.body, 'body', _position, true);
+				});
+				SpriteRenderer.ignoreDepthMinCap = false;
+				break;
 			default:
 				SpriteRenderer.position[2] = SpriteRenderer.position[2] + 0.2;
 				SpriteRenderer.zIndex = 150;
@@ -1124,7 +1134,7 @@ function renderLayer(layer, spr, pal, size, pos, type, isBlendModeOne) {
 		SpriteRenderer.color[3] = layer.color[3];
 	}
 
-	// apply disapear
+	// apply disappear
 	if (this.remove_tick) {
 		SpriteRenderer.color[3] *= 1 - (Date.now() - this.remove_tick) / this.remove_delay;
 	}

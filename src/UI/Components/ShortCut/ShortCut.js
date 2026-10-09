@@ -11,6 +11,7 @@
 import DB from 'DB/DBManager.js';
 import ItemType from 'DB/Items/ItemType.js';
 import SkillInfo from 'DB/Skills/SkillInfo.js';
+import SkillId from 'DB/Skills/SkillConst.js';
 import Client from 'Core/Client.js';
 import Preferences from 'Core/Preferences.js';
 import Session from 'Engine/SessionStorage.js';
@@ -153,7 +154,7 @@ ShortCut.init = function init() {
 	// Add to item owner name update queue
 	DB.UpdateOwnerName.ShortCut = onUpdateOwnerName;
 
-	Inventory.getUI().onUpdateItem = onUpdateItem;
+	Inventory.onUpdateItem = onUpdateItem;
 };
 
 /**
@@ -170,7 +171,7 @@ ShortCut.onAppend = function onAppend() {
 	this.magnet.LEFT = _preferences.magnet_left;
 	this.magnet.RIGHT = _preferences.magnet_right;
 
-	SkillWindow.getUI().onUpdateSkill = onUpdateSkill;
+	SkillWindow.onUpdateSkill = onUpdateSkill;
 
 	// Initialize tooltips for empty slots
 	updateEmptySlotTooltips();
@@ -241,33 +242,31 @@ ShortCut.onShortCut = function onShortCut(key) {
 	}
 };
 
-ShortCut.useSkill = function useSkill(id, level) {
-	if (id > 10000 && id < 10100) {
-		Guild.useSkillID(id, level);
-	} else if (id > 8000 && id < 8044) {
-		// if one of them don't have the skill, it returns early
-		SkillListMH.mercenary.useSkillID(id, level);
-		SkillListMH.homunculus.useSkillID(id, level);
-	} else {
-		SkillWindow.getUI().useSkillID(id, level);
+/**
+ * Resolve which skill window owns a skill id
+ *
+ * @param {number} skill id
+ * @return {object} component exposing useSkillID / getSkillById
+ */
+function getSkillOwner(id) {
+	if (id >= SkillId.GD_APPROVAL && id <= SkillId.GD_LAST) {
+		return Guild;
 	}
+	if (id >= SkillId.HOMUN_BEGIN && id <= SkillId.HOMUN_LAST) {
+		return SkillListMH.homunculus;
+	}
+	if (id >= SkillId.MERCENARY_BEGIN && id <= SkillId.MERCENARY_LAST) {
+		return SkillListMH.mercenary;
+	}
+	return SkillWindow;
+}
+
+ShortCut.useSkill = function useSkill(id, level) {
+	getSkillOwner(id).useSkillID(id, level);
 };
 
 ShortCut.getSkillById = function getSkillById(id) {
-	let skill;
-
-	if (id > 10000 && id < 10100) {
-		skill = Guild.getSkillById(id);
-	} else if (id > 8000 && id < 8044) {
-		skill = SkillListMH.mercenary.getSkillById(id);
-		if (!skill) {
-			skill = SkillListMH.homunculus.getSkillById(id);
-		}
-	} else {
-		skill = SkillWindow.getUI().getSkillById(id);
-	}
-
-	return skill;
+	return getSkillOwner(id).getSkillById(id);
 };
 
 /**
@@ -277,6 +276,7 @@ ShortCut.getSkillById = function getSkillById(id) {
  */
 ShortCut.setList = function setList(list) {
 	let skill;
+	let needGuildSkills = false;
 	const root = ShortCut.getRoot();
 
 	root.querySelectorAll('.container').forEach(el => {
@@ -288,6 +288,10 @@ ShortCut.setList = function setList(list) {
 	for (let i = 0, count = list.length; i < count; ++i) {
 		if (list[i].isSkill) {
 			skill = ShortCut.getSkillById(list[i].ID);
+
+			if (getSkillOwner(list[i].ID) === Guild) {
+				needGuildSkills = true;
+			}
 
 			if (skill && skill.level) {
 				ShortCut.addElement(i, true, list[i].ID, list[i].count || skill.level);
@@ -304,7 +308,16 @@ ShortCut.setList = function setList(list) {
 			ShortCut.addElement(i, list[i].isSkill, list[i].ID, list[i].count);
 		}
 	}
+
+	if (needGuildSkills) {
+		ShortCut.onRequestGuildSkills();
+	}
 };
+
+/**
+ * Hook: ask the server for the guild skill list (set by MapEngine/Guild)
+ */
+ShortCut.onRequestGuildSkills = function onRequestGuildSkills() {};
 
 /**
  * Update tooltip for empty slots with hotkey only
@@ -351,7 +364,7 @@ ShortCut.updateAllTooltips = function updateAllTooltips() {
 			if (_list[i].isSkill && SkillInfo[_list[i].ID]) {
 				name = SkillInfo[_list[i].ID].SkillName;
 			} else if (_list[i].ID) {
-				const item = Inventory.getUI().getItemById(_list[i].ID);
+				const item = Inventory.getItemById(_list[i].ID);
 				if (item) {
 					name = DB.getItemName(item);
 				}
@@ -581,7 +594,7 @@ ShortCut.addElement = function addElement(index, isSkill, ID, count) {
 		}
 	} else {
 		_list[index].count = count;
-		const item = Inventory.getUI().getItemById(ID);
+		const item = Inventory.getItemById(ID);
 
 		// Do not display items not in inventory
 		if (!item) {
@@ -881,7 +894,7 @@ function onElementInfo(event, icon) {
 
 		ItemInfo.append();
 		ItemInfo.uid = _list[index].ID;
-		ItemInfo.setItem(Inventory.getUI().getItemById(_list[index].ID));
+		ItemInfo.setItem(Inventory.getItemById(_list[index].ID));
 	}
 }
 
@@ -914,9 +927,9 @@ function clickElement(index) {
 	}
 	// Use the item
 	else {
-		const item = Inventory.getUI().getItemById(_list[index].ID);
+		const item = Inventory.getItemById(_list[index].ID);
 		if (item) {
-			Inventory.getUI().useItem(item);
+			Inventory.useItem(item);
 		}
 	}
 }
