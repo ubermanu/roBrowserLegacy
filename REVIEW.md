@@ -1,6 +1,6 @@
 # REVIEW.md — Code Review Guidelines
 
-For architecture, conventions, and subsystem details, see [AGENTS.md](AGENTS.md).
+For architecture, conventions, and subsystem details, see [AGENTS.md](AGENTS.md), scoped `src/*/AGENTS.md` files.
 
 ---
 
@@ -17,13 +17,14 @@ For architecture, conventions, and subsystem details, see [AGENTS.md](AGENTS.md)
 
 ### 🟡 Important — Request changes
 
-| Area                          | What to check                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Alias sync**                | Path aliases are defined in two places: `vite.config.js` (dev/test) and `applications/tools/builder-web.mjs` (production build). Changes to one must be mirrored in the other.                                                                                                                                                                                                                                                                                                                           |
-| **Entity mixins**             | Entity uses 17 composition mixins, not inheritance. Don't convert to class hierarchy — mixins are applied dynamically at runtime.                                                                                                                                                                                                                                                                                                                                                                        |
-| **Global state**              | New `window.*` or `self.*` assignments are not allowed. Existing **file-local** globals should be removed when touching the file. **Exception:** `window._OBJ_DRAG_` is a shared cross-component drag-and-drop contract (written by ~20 source components, read by Equipment/SwitchEquip/SkillList drop targets) — do NOT remove it piecemeal. It must be migrated atomically across all producers and consumers in a dedicated PR, not as a side effect of unrelated changes. See "What NOT to Review". |
-| **Vendors**                   | `src/Vendors/` is frozen. Never modify vendored files.                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| **Shadow DOM (GUIComponent)** | Never use jQuery `.show()`/`.hide()` inside Shadow DOM. Never use `$el.closest('body')` — use `el.isConnected`. Global CSS doesn't penetrate shadow boundaries — add shared rules to `Common.css`. See `docs/UIComponent_to_GUIComponent.md`.                                                                                                                                                                                                                                                            |
+| Area                          | What to check                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Alias sync**                | Path aliases are defined in two places: `vite.config.js` (dev/test) and `applications/tools/builder-web.mjs` (production build). Changes to one must be mirrored in the other.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **Entity mixins**             | Entity uses 17 composition mixins, not inheritance. Don't convert to class hierarchy — mixins are applied dynamically at runtime.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| **Global state**              | New `window.*` or `self.*` assignments are not allowed. Existing **file-local** globals (values attached to `window`/`self`/`globalThis` or otherwise leaked to global scope) should be removed when touching the file. **Not globals:** module-scoped `const` scratchpads/caches (e.g. preallocated `Float32Array`/`mat4`/`vec3` buffers reused per frame to avoid GC in render paths, and module-private GL resources like `_program`/`_buffer` in `src/Renderer/`) are an intentional performance pattern — do NOT flag them, and do not request moving them into an instance/state owner. **Exception:** `window._OBJ_DRAG_` is a shared cross-component drag-and-drop contract (written by ~20 source components, read by Equipment/SwitchEquip/SkillList drop targets) — do NOT remove it piecemeal. It must be migrated atomically across all producers and consumers in a dedicated PR, not as a side effect of unrelated changes. See "What NOT to Review". |
+| **Vendors**                   | `src/Vendors/` is frozen. Never modify vendored files, Only add allowed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **Shadow DOM (GUIComponent)** | Never use jQuery `.show()`/`.hide()` inside Shadow DOM. Never use `$el.closest('body')` — use `el.isConnected`. Global CSS doesn't penetrate shadow boundaries — add shared rules to `Common.css`. See `docs/UIComponent_to_GUIComponent.md`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **AGENTS.md**                 | Newer modules require registration in the appropriate scoped `src/*/AGENTS.md` (or [AGENTS.md](AGENTS.md)) topological map.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 ### 🟠 Flags — Always investigate
 
@@ -34,14 +35,31 @@ For architecture, conventions, and subsystem details, see [AGENTS.md](AGENTS.md)
 
 ### 🟢 Nice to have — Always Suggest but don't block
 
-| Area                   | What to check                                                                                                                                                                                  |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Modernize on touch** | Legacy patterns (`constructor functions`, `var`, string concatenation, etc.) should be modernized when the file is already being changed. See [AGENTS.md](AGENTS.md) for the conversion table. |
-| **Test coverage**      | New utilities and loaders should include tests. Tests go in `tests/` mirroring `src/` structure.                                                                                               |
+| Area                   | What to check                                                                                                                                                                                                        |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Modernize on touch** | Legacy patterns (`constructor functions`, `var`, string concatenation, etc.) should be modernized when the file is already being changed. See [docs/Architecture.md](docs/Architecture.md) for the conversion table. |
+| **Test coverage**      | New utilities and loaders should include tests. Tests go in `tests/` mirroring `src/` structure.                                                                                                                     |
 
 ### ✅ No Issues Found
 
 When no bugs are found, confirm explicitly that the PR was reviewed and no issues were identified. Don't just skip the review silently.
+
+---
+
+## JavaScript Modernization Review Guidelines
+
+When reviewing code check modernized the code are already changed when doing so is safe and behavior-preserving. Do **not** flag modernization outside of code changed.
+
+| Older Pattern                            | Preferred Pattern                                                                                  |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Callback `function(a, b) { ... }`        | `(a, b) => { ... }` **only** when lexical `this` is safe.                                          |
+| String concatenation with variables      | Template literals (`` `${a}${b}` ``).                                                              |
+| Constructor function + prototype methods | ES `class` and instance methods (except `Entity.js` mixins and `Entity.prototype` data whitelist). |
+| Object-literal singleton methods         | Static `class` methods when safe and consistent with the module.                                   |
+| `var x = obj.x \|\| defaultVal`          | `const` / `let` with destructuring defaults or explicit defaulting where semantics match.          |
+| File-local global assignment             | Explicit ES module imports/exports after auditing all consumers.                                   |
+
+**Critical `this` Caveat:** Arrow functions capture `this` lexically. Before converting callbacks, event handlers, asset/canvas loaders, or prototype methods, verify whether the caller invokes the function with dynamic `this` (`.call()` / `.apply()`). Keep a regular `function()` wherever dynamic binding is required.
 
 ---
 
@@ -60,6 +78,29 @@ original version.
 | **Flag minimalism**         | Each config flag maps to a real, pre-existing version difference — no invented/speculative options.                                     |
 | **Faithful HTML/CSS**       | In-factory generated HTML matches legacy node-for-node (classes, ids, `data-*`, asset paths).                                           |
 | **No behavior added**       | No new tabs/buttons/options; pre-existing bugs migrated 1:1 with a `// TODO`, not "fixed" here.                                         |
+
+---
+
+## WASM + JS fallback
+
+Some "hot paths" have dual implementations: WASM embedded as Base64 (generated from eg:
+`src/Loaders/wasm/*.wat`) and a JS fallback. E.g., `paletteConvert.wat` +
+`SPR.switchToRGBA()` in `Sprite.js`.
+
+When reviewing PRs that affect either implementation:
+
+- [ ] If a `.wat` file is changed, has the corresponding Base64 in the `.js` file been
+      regenerated? The two must never fall out of sync.
+- [ ] If the JS fallback is changed (byte order, vertical flip, palette layout,
+      buffer sizes), has the `.wat` file been updated to produce identical output?
+- [ ] Both implementations must be bit-exact: the same input must yield the same
+      output bytes. Request evidence (e.g., array comparison or a sprite screenshot).
+- [ ] The fallback must remain functional if `WebAssembly` is unavailable or if
+      instantiation fails—never assume that WASM is present.
+- [ ] Do not introduce SIMD opcodes (`v128`, `i32x4`, `FD` prefix) without verifying
+      support in the target engine; not all runtimes used in this project support SIMD.
+
+#### If missing regenerated files for wasm, teach user how to do it manually.
 
 ---
 
@@ -116,8 +157,9 @@ Both `npm test` (Vitest) and `npm run build` (custom builder) resolve imports th
 - `src/Vendors/` — frozen third-party code, excluded from lint
 - Lock files (`package-lock.json`) — unless dependencies changed intentionally
 - `window.electronAPI` in Electron files — platform requirement, not removable
-- `docs/*.md` — reference/prose docs (skip), EXCEPT agent operational memory (AGENTS.md, UIComponent_to_GUIComponent\*.md, GUIComponent_Version_Dedup_Factory.md) which is reviewed for correctness, not prose.
+- `docs/*.md` — reference/prose docs (skip), EXCEPT agent operational memory (`AGENTS.md`, `src/*/AGENTS.md`, `docs/Architecture.md`, `docs/UIComponent_to_GUIComponent*.md`, `docs/GUIComponent_Version_Dedup_Factory.md`) which is reviewed for correctness, not prose.
 - `window._OBJ_DRAG_` — shared drag-and-drop state across ~20 source components (Inventory, Storage, Cart, Mail, SkillList, Equipment, ShortCut, etc.). The HTML5 DnD `dataTransfer` API can't read its payload during `dragover`, which is why this global exists. Don't flag it as removable global state in single-file PRs; it requires a coordinated migration (e.g. a shared `DragDropState` module).
+- Module-scoped scratchpad buffers / caches in render code (`src/Renderer/**`) — these are deliberate per-frame allocation avoidance, not global state.
 
 ---
 

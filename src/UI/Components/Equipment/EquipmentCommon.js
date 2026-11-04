@@ -516,18 +516,15 @@ export function createEquipment({
 
 	Component.equip = function equip(item, location) {
 		const it = DB.getItemInfo(item.ITID);
-		if (entityRender) {
-			item.equipped = location;
-		}
-		_list[item.index] = item;
-
-		if (!entityRender && arguments.length === 1) {
+		if (!location && arguments.length === 1) {
 			if ('WearState' in item) {
 				location = item.WearState;
 			} else if ('location' in item) {
 				location = item.location;
 			}
 		}
+		item.equipped = location;
+		_list[item.index] = item;
 
 		function add3Dots(string, limit) {
 			function stripHTML(str) {
@@ -608,6 +605,21 @@ export function createEquipment({
 		if (UIVersionManager.getEquipmentVersion() > 0 && _btnLevelUp) {
 			document.body.appendChild(_btnLevelUp);
 		}
+	};
+
+	Component.getEquippedItem = function getEquippedItem(index) {
+		return _list[index] || null;
+	};
+
+	Component.getEquippedItemByLocation = function getEquippedItemByLocation(location) {
+		for (const key in _list) {
+			const item = _list[key];
+			const loc = item ? item.equipped || item.WearState || item.location || item.WearLocation || 0 : 0;
+			if (loc & location) {
+				return item;
+			}
+		}
+		return null;
 	};
 
 	Component.checkEquipLoc = function checkEquipLoc(location) {
@@ -720,13 +732,13 @@ export function createEquipment({
 				const cartBtn = root.querySelector('.cartitems');
 
 				if (_lastState & HasAttachmentState || _hasCart) {
-					if (removeOpt) removeOpt.style.display = '';
+					if (removeOpt) removeOpt.style.display = 'block';
 				} else {
 					if (removeOpt) removeOpt.style.display = 'none';
 				}
 
 				if (_lastState & HasCartState || _hasCart) {
-					if (cartBtn) cartBtn.style.display = '';
+					if (cartBtn) cartBtn.style.display = 'block';
 				} else {
 					if (cartBtn) cartBtn.style.display = 'none';
 				}
