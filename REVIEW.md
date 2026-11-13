@@ -35,14 +35,45 @@ For architecture, conventions, and subsystem details, see [AGENTS.md](AGENTS.md)
 
 ### 🟢 Nice to have — Always Suggest but don't block
 
-| Area                   | What to check                                                                                                                                                                                                        |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Modernize on touch** | Legacy patterns (`constructor functions`, `var`, string concatenation, etc.) should be modernized when the file is already being changed. See [docs/Architecture.md](docs/Architecture.md) for the conversion table. |
-| **Test coverage**      | New utilities and loaders should include tests. Tests go in `tests/` mirroring `src/` structure.                                                                                                                     |
+| Area                   | What to check                                                                                                                                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Modernize on touch** | Legacy patterns (`constructor functions`, `var`, string concatenation, etc.) should be modernized when the file is already being changed. See [docs/Architecture.md](docs/Architecture.md) for the conversion table.            |
+| **Test coverage**      | Only Loaders, Utils, and DB Constants should include Vitest unit tests (placed in `tests/` mirroring `src/`). NEVER test UI, rendering, or network flows with Vitest. These require real in-game inspection; Vitest is not E2E. |
 
 ### ✅ No Issues Found
 
 When no bugs are found, confirm explicitly that the PR was reviewed and no issues were identified. Don't just skip the review silently.
+
+---
+
+## DB / Lua runtime – concurrent execution
+
+- `DB.lazyInit` NEVER runs in parallel. It is guarded by the `DB.startedLazyInit`
+  flag in `src/Engine/LoginEngine.js` (`LoginEngine.init`).
+- `DB.startedLazyInit` is released only in:
+    - `DB.onReady` (load finished);
+    - the `catch` block of `DB.lazyInit` (load failed);
+    - `onLoginServerSelected` in `src/Engine/GameEngine.js`, which resets
+      `DB.isLoaded` / `DB.startedLazyInit` to reload the DB for a different server.
+      This reset is safe because the server list (`WinList`) is removed before
+      `LoginEngine.init` is called, and it is only reachable again after the
+      previous load has completed and the login screen was shown.
+- While loading, only the `Background` screen is displayed (background image +
+  progress bar). It has no buttons or any other interaction, so the player cannot
+  go back to server selection or switch servers until loading completes.
+- Pressing F5 reloads the whole page and wipes all JS state (Lua VMs, trackers,
+  flags), so it does not cause concurrent execution either.
+- Therefore, do NOT flag issues such as "switching servers during loading",
+  "overlapping `startLua` calls", "a stale tracker invoking `DB.onReady`", or the
+  absence of generation/invalidation counters in `src/DB/Loaders/LuaRuntime.js`
+  and `src/DB/Bootstrap/DBBootstrap.js`.
+- Only raise a concern if a PR:
+    - adds a new code path that calls `DB.lazyInit` / `startLua` without going
+      through the `DB.startedLazyInit` gate;
+    - adds a new place that resets `DB.startedLazyInit` / `DB.isLoaded`;
+    - makes `WinList` / `onLoginServerSelected` (or any interactive UI) reachable
+      while a load is in progress;
+    - removes or changes this gate.
 
 ---
 
@@ -115,20 +146,6 @@ npm test          # Vitest — runs all tests in tests/**/*.test.js
 - **All fixtures must be synthetic** — built in-memory from `ArrayBuffer`/`DataView`, no game files
 - **DB constant tests are regression guards** — they pin numeric IDs so accidental changes are caught by CI
 - **Node.js**: `>=22` required (`.nvmrc` pins Node 22; CI uses Node 24). Note: Node 25+ has experimental native `localStorage` on `globalThis` that can conflict with `jsdom`.
-
-### Test file organization
-
-```
-tests/
-├── db/           # DB constants & tables (12 files)
-├── engine/       # LoginEngine & MapEngine tests (2 files)
-├── fixtures/     # Synthetic test fixtures & mock helpers (2 files)
-├── loaders/      # Binary parsers (11 files, including GR2Loader.test.js)
-├── network/      # Packet structure, registration & handler tests (4 files)
-├── renderer/     # Renderer & GR2 tests (11 files, including 5 in GR2/)
-├── ui/           # GUIComponent & UI subsystem tests (22 files)
-└── util/         # Utilities (14 files)
-```
 
 ---
 
